@@ -5,13 +5,13 @@
 &emsp;&emsp;将一个`RDD`中的每个数据项，通过`map`中的函数映射变为一个新的元素。输入分区与输出分区是一对一的，即：有多少个输入分区，就有多少个输出分区。
 
 ```scala
-hadoop fs -cat /tmp/lxw1234/1.txt
+hadoop fs -cat /tmp/1234/1.txt
 hello world
 hello spark
 hello hive
  
 //读取HDFS文件到RDD
-scala> var data = sc.textFile("/tmp/lxw1234/1.txt")
+scala> var data = sc.textFile("/tmp/1234/1.txt")
 data: org.apache.spark.rdd.RDD[String] = MapPartitionsRDD[1] at textFile at :21
  
 //使用map算子
@@ -82,7 +82,7 @@ def coalesce(numPartitions: Int, shuffle: Boolean = false,
 第三个参数表示如何重分区的实现，默认为空。
 
 ```scala
-scala> var data = sc.textFile("/tmp/lxw1234/1.txt")
+scala> var data = sc.textFile("/tmp/1234/1.txt")
 data: org.apache.spark.rdd.RDD[String] = MapPartitionsRDD[53] at textFile at :21
  
 scala> data.collect

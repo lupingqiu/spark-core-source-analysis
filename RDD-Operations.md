@@ -134,3 +134,64 @@ rdd2: org.apache.spark.rdd.RDD[String] = MapPartitionsRDD[15] at repartition at 
 scala> rdd2.partitions.size
 res5: Int = 4
 ```
+
+### 1.6 randomSplit
+
+```scala
+def randomSplit(
+      weights: Array[Double],
+      seed: Long = Utils.random.nextLong): Array[RDD[T]] 
+```
+
+&emsp;&emsp;该函数根据`weights`权重，将一个`RDD`切分成多个`RDD`。该权重参数为一个`Double`数组，第二个参数为`random`的种子。
+
+```scala
+scala> var rdd = sc.makeRDD(1 to 10,10)
+rdd: org.apache.spark.rdd.RDD[Int] = ParallelCollectionRDD[16] at makeRDD at :21
+ 
+scala> rdd.collect
+res6: Array[Int] = Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)  
+ 
+scala> var splitRDD = rdd.randomSplit(Array(1.0,2.0,3.0,4.0))
+splitRDD: Array[org.apache.spark.rdd.RDD[Int]] = Array(MapPartitionsRDD[17] at randomSplit at :23, 
+MapPartitionsRDD[18] at randomSplit at :23, 
+MapPartitionsRDD[19] at randomSplit at :23, 
+MapPartitionsRDD[20] at randomSplit at :23)
+ 
+//这里注意：randomSplit的结果是一个RDD数组
+scala> splitRDD.size
+res8: Int = 4
+//由于randomSplit的第一个参数weights中传入的值有4个，因此，就会切分成4个RDD,
+//把原来的rdd按照权重1.0,2.0,3.0,4.0，随机划分到这4个RDD中，权重高的RDD，划分到的几率就大一些。
+//注意，权重的总和加起来为1，否则会不正常
+ 
+scala> splitRDD(0).collect
+res10: Array[Int] = Array(1, 4)
+ 
+scala> splitRDD(1).collect
+res11: Array[Int] = Array(3)                                                    
+ 
+scala> splitRDD(2).collect
+res12: Array[Int] = Array(5, 9)
+ 
+scala> splitRDD(3).collect
+res13: Array[Int] = Array(2, 6, 7, 8, 10)
+```
+
+### 1.7 glom
+
+```scala
+def glom(): RDD[Array[T]]
+```
+
+&emsp;&emsp;该函数是将`RDD`中每一个分区中所有元素转换成数组，这样每一个分区就只有一个数组元素。
+
+```scala
+scala> var rdd = sc.makeRDD(1 to 10,3)
+rdd: org.apache.spark.rdd.RDD[Int] = ParallelCollectionRDD[38] at makeRDD at :21
+scala> rdd.partitions.size
+res33: Int = 3  //该RDD有3个分区
+scala> rdd.glom().collect
+res35: Array[Array[Int]] = Array(Array(1, 2, 3), Array(4, 5, 6), Array(7, 8, 9, 10))
+//glom将每个分区中的元素放到一个数组中，这样，结果就变成了3个数组
+```

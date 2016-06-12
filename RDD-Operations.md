@@ -195,3 +195,268 @@ scala> rdd.glom().collect
 res35: Array[Array[Int]] = Array(Array(1, 2, 3), Array(4, 5, 6), Array(7, 8, 9, 10))
 //glom将每个分区中的元素放到一个数组中，这样，结果就变成了3个数组
 ```
+
+### 1.8 union
+
+```scala
+def union(other: RDD[T]): RDD[T]
+```
+&emsp;&emsp;该函数比较简单，就是将两个RDD进行合并，不去重。
+
+```scala
+scala> var rdd1 = sc.makeRDD(1 to 2,1)
+rdd1: org.apache.spark.rdd.RDD[Int] = ParallelCollectionRDD[45] at makeRDD at :21
+ 
+scala> rdd1.collect
+res42: Array[Int] = Array(1, 2)
+ 
+scala> var rdd2 = sc.makeRDD(2 to 3,1)
+rdd2: org.apache.spark.rdd.RDD[Int] = ParallelCollectionRDD[46] at makeRDD at :21
+ 
+scala> rdd2.collect
+res43: Array[Int] = Array(2, 3)
+ 
+scala> rdd1.union(rdd2).collect
+res44: Array[Int] = Array(1, 2, 2, 3)
+```
+
+### 1.9 intersection
+
+```scala
+def intersection(other: RDD[T]): RDD[T]
+def intersection(other: RDD[T], numPartitions: Int): RDD[T]
+def intersection(other: RDD[T], partitioner: Partitioner)(implicit ord: Ordering[T] = null): RDD[T]
+```
+
+&emsp;&emsp;该函数返回两个`RDD`的交集，并且去重。参数`numPartitions`指定返回的`RDD`的分区数。参数`partitioner`用于指定分区函数。
+
+```scala
+scala> var rdd1 = sc.makeRDD(1 to 2,1)
+rdd1: org.apache.spark.rdd.RDD[Int] = ParallelCollectionRDD[45] at makeRDD at :21
+ 
+scala> rdd1.collect
+res42: Array[Int] = Array(1, 2)
+ 
+scala> var rdd2 = sc.makeRDD(2 to 3,1)
+rdd2: org.apache.spark.rdd.RDD[Int] = ParallelCollectionRDD[46] at makeRDD at :21
+ 
+scala> rdd2.collect
+res43: Array[Int] = Array(2, 3)
+ 
+scala> rdd1.intersection(rdd2).collect
+res45: Array[Int] = Array(2)
+ 
+scala> var rdd3 = rdd1.intersection(rdd2)
+rdd3: org.apache.spark.rdd.RDD[Int] = MapPartitionsRDD[59] at intersection at :25
+ 
+scala> rdd3.partitions.size
+res46: Int = 1
+ 
+scala> var rdd3 = rdd1.intersection(rdd2,2)
+rdd3: org.apache.spark.rdd.RDD[Int] = MapPartitionsRDD[65] at intersection at :25
+ 
+scala> rdd3.partitions.size
+res47: Int = 2
+```
+
+### 1.10 subtract
+
+```scala
+def subtract(other: RDD[T]): RDD[T]
+def subtract(other: RDD[T], numPartitions: Int): RDD[T]
+def subtract(other: RDD[T], partitioner: Partitioner)(implicit ord: Ordering[T] = null): RDD[T]
+```
+
+&emsp;&emsp;该函数类似于`intersection`，但返回在`RDD`中出现，并且不在`otherRDD`中出现的元素，不去重。
+
+```scala
+scala> var rdd1 = sc.makeRDD(Seq(1,2,2,3))
+rdd1: org.apache.spark.rdd.RDD[Int] = ParallelCollectionRDD[66] at makeRDD at :21
+
+scala> rdd1.collect
+res48: Array[Int] = Array(1, 2, 2, 3)
+
+scala> var rdd2 = sc.makeRDD(3 to 4)
+rdd2: org.apache.spark.rdd.RDD[Int] = ParallelCollectionRDD[67] at makeRDD at :21
+
+scala> rdd2.collect
+res49: Array[Int] = Array(3, 4)
+
+scala> rdd1.subtract(rdd2).collect
+res50: Array[Int] = Array(1, 2, 2)
+```
+
+### 1.11 mapPartitions
+
+```scala
+def mapPartitions[U: ClassTag](
+      f: Iterator[T] => Iterator[U],
+      preservesPartitioning: Boolean = false): RDD[U]
+```
+
+&emsp;&emsp;该函数和`map`函数类似，只不过映射函数的参数由`RDD`中的每一个元素变成了`RDD`中每一个分区的迭代器。如果在映射的过程中需要频繁创建额外的对象，使用`mapPartitions`要比`map`高效的多。
+
+&emsp;&emsp;比如，将`RDD`中的所有数据通过`JDBC`连接写入数据库，如果使用`map`函数，可能要为每一个元素都创建一个`connection`，这样开销很大，如果使用`mapPartitions`，那么只需要针对每一个分区建立一个`connection`。
+
+&emsp;&emsp;参数`preservesPartitioning`表示是否保留父`RDD`的`partitioner`分区信息。
+
+```scala
+var rdd1 = sc.makeRDD(1 to 5,2)
+//rdd1有两个分区
+scala> var rdd3 = rdd1.mapPartitions{ x => {
+     | var result = List[Int]()
+     |     var i = 0
+     |     while(x.hasNext){
+     |       i += x.next()
+     |     }
+     |     result.::(i).iterator
+     | }}
+rdd3: org.apache.spark.rdd.RDD[Int] = MapPartitionsRDD[84] at mapPartitions at :23
+ 
+//rdd3将rdd1中每个分区中的数值累加
+scala> rdd3.collect
+res65: Array[Int] = Array(3, 12)
+scala> rdd3.partitions.size
+res66: Int = 2
+```
+
+### 1.12 mapPartitionsWithIndex
+
+```scala
+def mapPartitionsWithIndex[U: ClassTag](
+      f: (Int, Iterator[T]) => Iterator[U],
+      preservesPartitioning: Boolean = false): RDD[U]
+```
+
+&emsp;&emsp;函数作用同`mapPartitions`相同，不过提供了两个参数，第一个参数为分区的索引。
+
+```scala
+var rdd1 = sc.makeRDD(1 to 5,2)
+//rdd1有两个分区
+var rdd2 = rdd1.mapPartitionsWithIndex{
+        (x,iter) => {
+          var result = List[String]()
+            var i = 0
+            while(iter.hasNext){
+              i += iter.next()
+            }
+            result.::(x + "|" + i).iterator
+
+        }
+      }
+//rdd2将rdd1中每个分区的数字累加，并在每个分区的累加结果前面加了分区索引
+scala> rdd2.collect
+res13: Array[String] = Array(0|3, 1|12)
+```
+
+### 1.13 zip
+
+```scala
+  def zip[U: ClassTag](other: RDD[U]): RDD[(T, U)] 
+```
+
+&emsp;&emsp;`zip`函数用于将两个`RDD`组合成`Key/Value`形式的`RDD`,这里默认两个`RDD`的`partition`数量以及每个`partition`的元素数量都相同，否则会抛出异常。
+
+```scala
+scala> var rdd1 = sc.makeRDD(1 to 5,2)
+rdd1: org.apache.spark.rdd.RDD[Int] = ParallelCollectionRDD[1] at makeRDD at :21
+ 
+scala> var rdd2 = sc.makeRDD(Seq("A","B","C","D","E"),2)
+rdd2: org.apache.spark.rdd.RDD[String] = ParallelCollectionRDD[2] at makeRDD at :21
+ 
+scala> rdd1.zip(rdd2).collect
+res0: Array[(Int, String)] = Array((1,A), (2,B), (3,C), (4,D), (5,E))           
+ 
+scala> rdd2.zip(rdd1).collect
+res1: Array[(String, Int)] = Array((A,1), (B,2), (C,3), (D,4), (E,5))
+ 
+scala> var rdd3 = sc.makeRDD(Seq("A","B","C","D","E"),3)
+rdd3: org.apache.spark.rdd.RDD[String] = ParallelCollectionRDD[5] at makeRDD at :21
+ 
+scala> rdd1.zip(rdd3).collect
+java.lang.IllegalArgumentException: Can't zip RDDs with unequal numbers of partitions
+//如果两个RDD分区数不同，则抛出异常
+```
+
+### 1.14 zipPartitions
+
+```scala
+def zipPartitions[B: ClassTag, V: ClassTag]
+      (rdd2: RDD[B], preservesPartitioning: Boolean)
+      (f: (Iterator[T], Iterator[B]) => Iterator[V]): RDD[V] = withScope {
+    new ZippedPartitionsRDD2(sc, sc.clean(f), this, rdd2, preservesPartitioning)
+  }
+def zipPartitions[B: ClassTag, C: ClassTag, V: ClassTag]
+      (rdd2: RDD[B], rdd3: RDD[C], preservesPartitioning: Boolean)
+      (f: (Iterator[T], Iterator[B], Iterator[C]) => Iterator[V]): RDD[V] = withScope {
+    new ZippedPartitionsRDD3(sc, sc.clean(f), this, rdd2, rdd3, preservesPartitioning)
+  }
+def zipPartitions[B: ClassTag, C: ClassTag, D: ClassTag, V: ClassTag]
+      (rdd2: RDD[B], rdd3: RDD[C], rdd4: RDD[D], preservesPartitioning: Boolean)
+      (f: (Iterator[T], Iterator[B], Iterator[C], Iterator[D]) => Iterator[V]): RDD[V] = withScope {
+    new ZippedPartitionsRDD4(sc, sc.clean(f), this, rdd2, rdd3, rdd4, preservesPartitioning)
+  }
+```
+
+&emsp;&emsp;`zipPartitions`函数将多个`RDD`按照`partition`组合成为新的`RDD`，该函数需要组合的`RDD`具有相同的分区数，但对于每个分区内的元素数量没有要求。
+
+```scala
+val a = sc.parallelize(0 to 9, 3)
+val b = sc.parallelize(10 to 19, 3)
+val c = sc.parallelize(100 to 109, 3)
+def myfunc(aiter: Iterator[Int], biter: Iterator[Int], citer: Iterator[Int]): Iterator[String] =
+{
+  var res = List[String]()
+  while (aiter.hasNext && biter.hasNext && citer.hasNext)
+  {
+    val x = aiter.next + " " + biter.next + " " + citer.next
+    res ::= x
+  }
+  res.iterator
+}
+a.zipPartitions(b, c)(myfunc).collect
+res50: Array[String] = Array(2 12 102, 1 11 101, 0 10 100, 5 15 105, 4 14 104, 3 13 103, 9 19 109, 8 18 108, 7 17 107, 6 16 106)
+```
+
+### 1.15 zipWithIndex
+
+```scala
+def zipWithIndex(): RDD[(T, Long)]
+```
+&emsp;&emsp;该函数将`RDD`中的元素和这个元素在`RDD`中的`ID`（索引号）组合成键/值对。
+
+```scala
+val z = sc.parallelize(Array("A", "B", "C", "D"))
+val r = z.zipWithIndex
+res110: Array[(String, Long)] = Array((A,0), (B,1), (C,2), (D,3))
+
+val z = sc.parallelize(100 to 120, 5)
+val r = z.zipWithIndex
+r.collect
+res11: Array[(Int, Long)] = Array((100,0), (101,1), (102,2), (103,3), (104,4), (105,5), (106,6), (107,7), (108,8), (109,9), (110,10), (111,11), (112,12), (113,13), (114,14), (115,15), (116,16), (117,17), (118,18), (119,19), (120,20))
+```
+
+### 1.16 zipWithUniqueId
+
+```scala
+def zipWithUniqueId(): RDD[(T, Long)]
+```
+
+&emsp;&emsp;该函数将RDD中元素和一个唯一ID组合成键/值对，该唯一ID生成算法如下：
+
+- 每个分区中第一个元素的唯一ID值为：该分区索引号
+- 每个分区中第N个元素的唯一ID值为：(前一个元素的唯一ID值) + (该RDD总的分区数)
+
+```scala
+val z = sc.parallelize(100 to 120, 5)
+val r = z.zipWithUniqueId
+r.collect
+
+res12: Array[(Int, Long)] = Array((100,0), (101,5), (102,10), (103,15), (104,1), (105,6), (106,11), (107,16), (108,2), (109,7), (110,12), (111,17), (112,3), (113,8), (114,13), (115,18), (116,4), (117,9), (118,14), (119,19), (120,24))
+```
+
+## 2 键值转换操作
+
+### 2.1 partitionBy
+
+

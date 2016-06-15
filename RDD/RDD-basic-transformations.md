@@ -453,6 +453,40 @@ r.collect
 res12: Array[(Int, Long)] = Array((100,0), (101,5), (102,10), (103,15), (104,1), (105,6), (106,11), (107,16), (108,2), (109,7), (110,12), (111,17), (112,3), (113,8), (114,13), (115,18), (116,4), (117,9), (118,14), (119,19), (120,24))
 ```
 
+### 17 aggregate
+
+```scala
+def aggregate[U: ClassTag](zeroValue: U)(seqOp: (U, T) => U, combOp: (U, U) => U): U
+```
+
+&emsp;&emsp;`aggregate`函数将每个分区里面的元素进行聚合，然后用`combine`函数将每个分区的结果和初始值(`zeroValue`)进行`combine`操作。这个函数最终返回的类型不需要和`RDD`中元素类型一致。
+
+```scala
+scala> def seqOP(a:Int, b:Int) : Int = {
+     | println("seqOp: " + a + "\t" + b)
+     | math.min(a,b)
+     | }
+seqOP: (a: Int, b: Int)Int
+scala> def combOp(a:Int, b:Int): Int = {
+     | println("combOp: " + a + "\t" + b)
+     | a + b
+     | }
+combOp: (a: Int, b: Int)Int
+scala> val z = sc. parallelize ( List (1 ,2 ,3 ,4 ,5 ,6) , 2)
+scala> z. aggregate(3)(seqOP, combOp)
+res20: Int = 7
+```
+
+### 18 treeAggregate
+
+```scala
+def treeAggregate[U: ClassTag](zeroValue: U)(
+      seqOp: (U, T) => U,
+      combOp: (U, U) => U,
+      depth: Int = 2): U
+```
+&emsp;&emsp;这里`treeAggregate`类似于`aggregate`方法，不同的是在每个分区，该函数会做两次（默认两次）或两次以上的`merge`聚合操作，避免将所有的局部值传回`driver`端。
+
 ## 参考资料
 
 [Spark算子系列文章](http://lxw1234.com/archives/2015/07/363.htm)
